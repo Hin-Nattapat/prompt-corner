@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hero.jpg" width="820" alt="A prompt corner in the wings: a lectern holding an open book whose pages are a code diff, lit by one clip-on lamp, a red cue light on the lectern edge, and a pool of light on the empty stage beyond">
+</p>
+
 <h1 align="center">prompt-corner</h1>
 
 <p align="center">
@@ -28,9 +32,9 @@ it — two phases get re-scoped, in the session that can least afford it.
 
 **With.** That assumption was a row in the map before phase 1 started:
 
-```
-| P4 | LM sends merchant_id (snake) in the order webhook | external-api | ❓ | partners/lineman/gotchas.md#L88 | LM team |
-```
+| id | premise | type | status | evidence | who can confirm |
+|---|---|---|---|---|---|
+| P4 | LM sends `merchant_id` (snake) in the order webhook | external-api | ❓ | `partners/lineman/gotchas.md:88` | LM team |
 
 `❓` means blocked, and blocked means phase 1 does not build on it. The verify script prints
 `ASK P4` at the top of every session until a human settles it.
@@ -48,36 +52,70 @@ it — two phases get re-scoped, in the session that can least afford it.
 
 ## How it works
 
-```
-"build feature X"  →  stage-manager
-                          │
-                          ├─ 1. brainstorming              only if the design is still fuzzy
-                          │
-                          ├─ 2. prompt-book                ── STOP ── every ❓/🔒 premise, batched
-                          │                                ── STOP ── confirm the finished map
-                          │
-                          └─ 3. per phase, in order:
-                                 writing-plans             this phase only, never the whole feature
-                                 implement
-                                 notes-call ──┬─ type A ── fixes it itself, max 3 rounds
-                                              └─ type B ── curtain-hold ── STOP ── patch or structural?
-                                 smoke                     you drive what you can; the rest is a
-                                                           blocking checklist for the human
-                                 ── STOP ──                report and wait
-                                 "push and pr"             one PR per repo, never a merge
+**Before phase 1** — the map is written once, and it stops twice:
+
+```mermaid
+%%{init: {"themeVariables": {"edgeLabelBackground": "#0d1117"}, "flowchart": {"nodeSpacing": 30, "rankSpacing": 38, "useMaxWidth": false, "curve": "basis"}}}%%
+flowchart LR
+    SM["stage-manager"] --> BS["brainstorming"] --> PB["prompt-book"]
+    PB --> S1(["STOP · open premises"]) --> S2(["STOP · confirm the map"]) --> P1(["phase 1 →"])
+
+    classDef default fill:#1c2128,stroke:#3d444d,stroke-width:1px,color:#d7dde5
+    classDef stop fill:#241d14,stroke:#c99a4e,stroke-width:1.5px,color:#e8c98c
+    class S1,S2 stop
+    linkStyle default stroke:#7d8590,stroke-width:1.2px
 ```
 
-Every `STOP` waits for a person. There is no flag, mode, or phrasing that walks through one.
+**Then, per phase, in order** — and the loop only closes when a person says so:
+
+```mermaid
+%%{init: {"themeVariables": {"edgeLabelBackground": "#0d1117"}, "flowchart": {"nodeSpacing": 30, "rankSpacing": 38, "useMaxWidth": false, "curve": "basis"}}}%%
+flowchart LR
+    WP["writing-plans"] --> IMP["implement"] --> NC["notes-call"]
+    NC -->|A| FIX["fix in place"] --> SMK["smoke"]
+    NC -->|B| CH["curtain-hold"] --> S3(["STOP · patch or structural"]) --> SMK
+    SMK --> S4(["STOP · report and wait"]) --> PR["push and pr"]
+    PR -.->|next phase| WP
+
+    classDef default fill:#1c2128,stroke:#3d444d,stroke-width:1px,color:#d7dde5
+    classDef stop fill:#241d14,stroke:#c99a4e,stroke-width:1.5px,color:#e8c98c
+    class S3,S4 stop
+    linkStyle default stroke:#7d8590,stroke-width:1.2px
+```
+
+| step | what it is bound by |
+|---|---|
+| `brainstorming` | skipped entirely when the design is already settled |
+| `prompt-book` | rules, contracts and premises — written once, before phase 1 |
+| `writing-plans` | this phase only, never the whole feature |
+| `notes-call` | a ledger row per changed hunk; **A** it repairs itself, max 3 rounds; **B** it escalates |
+| `curtain-hold` | maps the blast radius, classifies, and never fixes anything |
+| `smoke` | you drive what you can; the rest is a blocking checklist for a person |
+| `push and pr` | one PR per repo, never a merge |
+
+`dress-run` runs inside `notes-call` as its craft dimension; `call-board` answers "where is
+everything" from outside the flow, at any point.
+
+**Every `STOP` waits for a person.** There is no flag, mode, or phrasing that walks through one —
+including a stop that arrives when the work is nearly done, which is the most expensive one to skip.
 
 ### What the ledger is for
 
 `notes-call` builds one row per changed hunk, and each row carries the output of a grep the
 **rule** picked — not one the writer picked:
 
+| File (hunk) | +/- | Status | Observation |
+|---|---|---|---|
+| `internal/service/order.go` (214–224) | +42/-8 | ✅ | signature changed: `ApplyDiscount` — see the grep below |
+
 ```
-| internal/service/order.go (hunk 214–224) | +42/-8 | ✅ | signature changed: ApplyDiscount —
-  git grep -n ApplyDiscount -- . ':(exclude)vendor' → report/daily.go:88 · order.go:214
-  (2 hits, unexcluded) |
+git grep -n ApplyDiscount -- . ':(exclude)vendor'
+
+  report/daily.go:88            total := svc.ApplyDiscount(o, nil)
+      ↑ outside the diff, so it is listed first
+  internal/service/order.go:214 func (s *service) ApplyDiscount(
+
+  (2 hits, unexcluded)
 ```
 
 It guarantees **completeness**, not depth: every hunk has a row and the line total has to match
@@ -90,13 +128,13 @@ here asks for one.
 `curtain-hold` never fixes anything. It returns exactly this and waits:
 
 ```
-ข้อเท็จจริง : voucher_id is nullable in online orders — internal/entity/order.go:88
+ข้อเท็จจริง : voucher_id is nullable online — entity/order.go:88
 ขัดกับ      : §3 contract "phase 2 always supplies voucher_id"
-กระทบ       : receipt print (print/receipt.go:214) · KDS summary (kds/summary.go:66)
+กระทบ       : receipt print (receipt.go:214) · KDS (summary.go:66)
 จำแนก       : structural — เข้าเกณฑ์ข้อ C2
-A (patch)      : null-guard at the mapper · 20 min · debt: two more readers stay unguarded
+A (patch)      : null-guard at the mapper · 20 min · 2 readers left unguarded
 B (structural) : fix §3, re-scope phase 3 · half a day
-แนะนำ       : B — A leaves the same bug in two places nobody is tracking
+แนะนำ       : B — A leaves the same bug in two untracked places
 ```
 
 ## Install
@@ -129,8 +167,11 @@ Same skills, no namespace — they appear under their bare names. Use this if yo
 marketplace:
 
 ```bash
-npx skills add Hin-Nattapat/prompt-corner -g -a claude-code --skill '*' -y   # every project
-npx skills add Hin-Nattapat/prompt-corner -a claude-code --skill '*' -y      # this project only
+# every project
+npx skills add Hin-Nattapat/prompt-corner -g -a claude-code --skill '*' -y
+
+# this project only
+npx skills add Hin-Nattapat/prompt-corner -a claude-code --skill '*' -y
 ```
 
 Pick one or the other. Installing both leaves two copies of every skill in the list.
@@ -144,8 +185,8 @@ CLI supports. The workflow assumes a git repo and, for `call-board`, the `gh` CL
 ### Update
 
 ```bash
-claude plugin update prompt-corner                 # plugin install (restart to apply)
-npx skills update -g                               # plain-skill install
+claude plugin update prompt-corner    # plugin install (restart to apply)
+npx skills update -g                  # plain-skill install
 ```
 
 ### Uninstall
@@ -154,7 +195,8 @@ npx skills update -g                               # plain-skill install
 claude plugin uninstall prompt-corner@prompt-corner
 claude plugin marketplace remove prompt-corner
 # or, for a plain-skill install:
-npx skills remove stage-manager prompt-book notes-call call-board curtain-hold dress-run
+npx skills remove stage-manager prompt-book notes-call \
+                  call-board curtain-hold dress-run
 ```
 
 ## Per-project settings — `.claude/house.md`
@@ -255,8 +297,11 @@ git clone https://github.com/Hin-Nattapat/prompt-corner && cd prompt-corner
 $EDITOR skills/dress-run/packs/go.md
 git push
 
-claude plugin update prompt-corner                      # plugin install, then restart the session
-npx skills add . -g -a claude-code --skill '*' -y       # plain-skill install, straight from the working copy
+# plugin install — then restart the session
+claude plugin update prompt-corner
+
+# plain-skill install — straight from the working copy, no push needed
+npx skills add . -g -a claude-code --skill '*' -y
 ```
 
 The second form takes a local path, so it picks up an edit without a push — handy while iterating.
@@ -268,7 +313,7 @@ version in the same commit as the change, every time.
 Layout:
 
 ```
-skills/<name>/SKILL.md          the skill; frontmatter description is what makes it fire
+skills/<name>/SKILL.md          the skill; its description is what makes it fire
 skills/prompt-book/assets/      chk.sh, seeded into a project's programs dir
 skills/prompt-book/reference/   the program-map format authority
 skills/dress-run/packs/         one file per language

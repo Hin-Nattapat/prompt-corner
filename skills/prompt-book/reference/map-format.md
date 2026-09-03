@@ -41,6 +41,8 @@ line in the real map file.
    §1 and §4 together should stay under ~8 KB, or every session of every phase carries the excess.
    A §4 that overflows its injection cap is not a formatting problem — it means that many premises
    are still open, and the answer is to close them, never to trim the table.
+   What may occupy a §4 row at all is `prompt-book`'s step 5, not this file: a premise a `git grep`
+   settles on demand belongs in the phase plan instead.
 2. The verify script MUST be named `verify-<program>.sh`, where `<program>` is the exact
    value of the map's `program:` frontmatter field — NOT derived from the map's filename
    (map files are named `YYYY-MM-DD-<topic>.md`, so a filename-derived name is never found).
