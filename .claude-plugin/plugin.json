@@ -1,6 +1,6 @@
 {
   "name": "prompt-corner",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Six skills that drive a multi-phase feature from design to the last merged PR, stopping at every gate",
   "author": {
     "name": "Hin-Nattapat"

@@ -74,6 +74,7 @@ flowchart LR
     WP["writing-plans"] --> IMP["implement"] --> NC["notes-call"]
     NC -->|A| FIX["fix in place"] --> SMK["smoke"]
     NC -->|B| CH["curtain-hold"] --> S3(["STOP · patch or structural"]) --> SMK
+    NC -.->|O| S4
     SMK --> S4(["STOP · report and wait"]) --> PR["push and pr"]
     PR -.->|next phase| WP
 
@@ -88,40 +89,48 @@ flowchart LR
 | `brainstorming` | skipped entirely when the design is already settled |
 | `prompt-book` | rules, contracts and premises — written once, before phase 1 |
 | `writing-plans` | this phase only, never the whole feature |
-| `notes-call` | a ledger row per changed hunk; **A** it repairs itself, max 3 rounds; **B** it escalates |
+| `notes-call` | a script-built ledger; **A** it repairs itself, max 3 rounds; **O** waits for the owner at the STOP; **B** it escalates |
 | `curtain-hold` | maps the blast radius, classifies, and never fixes anything |
 | `smoke` | you drive what you can; the rest is a blocking checklist for a person |
 | `push and pr` | one PR per repo, never a merge |
 
-`dress-run` runs inside `notes-call` as its craft dimension; `call-board` answers "where is
-everything" from outside the flow, at any point.
+`dress-run` is the craft checklist the one reviewer per chunk walks inside `notes-call`;
+`call-board` answers "where is everything" from outside the flow, at any point, and runs the
+project's runtime checks before smoke.
 
 **Every `STOP` waits for a person.** There is no flag, mode, or phrasing that walks through one —
 including a stop that arrives when the work is nearly done, which is the most expensive one to skip.
 
 ### What the ledger is for
 
-`notes-call` builds one row per changed hunk, and each row carries the output of a grep the
-**rule** picked — not one the writer picked:
-
-| File (hunk) | +/- | Status | Observation |
-|---|---|---|---|
-| `internal/service/order.go` (214–224) | +42/-8 | ✅ | signature changed: `ApplyDiscount` — see the grep below |
+`notes-call` does not write its ledger; a script does. `ledger.sh` measures the working tree
+against the merge-base — committed, staged, unstaged and untracked in one range — picks every
+symbol the hunks declare or re-declare, and greps the whole repo for each, callers **outside the
+diff** first:
 
 ```
-git grep -n ApplyDiscount -- . ':(exclude)vendor'
+LEDGER  base origin/develop@c52ab2c · 5 files · 412 lines (+380/-32) · 1 untracked · 9 symbols
+MODE    inline · floor 150 · fan-out 800
 
-  report/daily.go:88            total := svc.ApplyDiscount(o, nil)
-      ↑ outside the diff, so it is listed first
-  internal/service/order.go:214 func (s *service) ApplyDiscount(
-
-  (2 hits, unexcluded)
+internal/service/order.go   +42/-8   hunks 214-224 300-310
+  ApplyDiscount                6 hits · 4 outside diff (2 in excluded paths)
+    report/daily.go:88:	total := svc.ApplyDiscount(o, nil)
+  ErrMemberLocked              1 hits · 0 outside diff
 ```
 
-It guarantees **completeness**, not depth: every hunk has a row and the line total has to match
-`--numstat`. Depth is someone else's job — the second reviewer re-runs two rows verbatim and
-reports `ตรง` / `ไม่ตรง`. An attestation you write about your own reading is free, so nothing
-here asks for one.
+It guarantees **completeness**, not depth: every changed file has a block and nothing in it is
+the writer's word — doubt it, rerun it. Depth is the reviewer's job: open every outside-diff hit
+and decide whether that caller is still right. The thresholds on the `MODE` line come from
+`house.md`, so a project's review budget is a setting, not an argument with the skill.
+
+### Three bins, not two
+
+Every finding lands in one of three places. **A**: the plan says X, the code does not, the fix
+stays inside the plan's files — fix it, up to three rounds, one commit per round. **O**: the code
+and the plan disagree and the honest fix may be the plan's sentence — a bulk write through the
+existing hook instead of the endpoint the plan named. One drift-log line, one bullet at the
+STOP, the owner decides. **B**: one of seven structural criteria applies — a contract, a cross-repo
+consumer, a second source of truth. Only B goes to `curtain-hold`.
 
 ### What a stop looks like
 
@@ -218,9 +227,14 @@ programs-dir: docs/programs
 | `repos:` | `call-board` | every git repo at the root and one level down |
 | `base-branch:` | `notes-call`, `dress-run` | `origin/HEAD`, else `main` |
 | `programs-dir:` | `prompt-book`, `call-board` | `.claude/programs/` |
+| `review-floor-lines:` | `notes-call` | 150 — at or under, the review collapses |
+| `review-fanout-lines:` | `notes-call` | 800 — above, the review fans out |
+| `review-chunk-lines:` | `notes-call` | 400 per chunk |
+| `review-max-chunks:` | `notes-call` | unlimited — set it and an over-budget fan-out stops to ask |
 | `## Default flow` | `stage-manager`, `curtain-hold` | the sequence above |
 | `## Git tail` | `stage-manager` | branch → group → rebase → push → PR, never merge |
 | `## Smoke` | `stage-manager` | drive what you can, hand the rest over as a blocking checklist |
+| `## Runtime` | `call-board`, `stage-manager` | not checked, and the report says so |
 | `## Reference locations` | `prompt-book` | nothing to sweep |
 | `## Known consumers` | `curtain-hold`, `dress-run` | grep only |
 | `## Shared modules` | `dress-run` | callers are in-repo only |
@@ -315,6 +329,8 @@ Layout:
 ```
 skills/<name>/SKILL.md          the skill; its description is what makes it fire
 skills/prompt-book/assets/      chk.sh, seeded into a project's programs dir
+skills/notes-call/assets/       ledger.sh, the script that builds the coverage ledger
+skills/notes-call/reference/    why the ledger is a script — read when changing it
 skills/prompt-book/reference/   the program-map format authority
 skills/dress-run/packs/         one file per language
 house.example.md                the per-project settings template
@@ -326,11 +342,12 @@ house.example.md                the per-project settings template
 one that assumes the others.
 
 **Does it work in a repo with no program map?** Yes — that is the lean path, and it is where most
-work stays. `notes-call` collapses to a one-line ledger under 5 files / 150 lines, and
-`prompt-book` refuses to write a map for single-phase work.
+work stays. `notes-call` collapses to a few lines under its floor (150 lines and 5 files by default,
+`review-floor-lines` in `house.md`), and `prompt-book` refuses to write a map for single-phase work.
 
-**Will it commit or push for me?** No. Committing, pushing, merging and running a project-wide
-formatter are refused at every diff size.
+**Will it commit or push for me?** Only one kind of commit: `notes-call` commits each fix round
+as `fix: review round <n>` so nothing sits uncommitted, and the git tail squashes those. Pushing,
+merging and running a project-wide formatter are refused at every diff size.
 
 **Why is some of it in Thai?** The report formats are fixed strings the author reads at a glance.
 They are transcribed verbatim, not translated, so they stay diffable.

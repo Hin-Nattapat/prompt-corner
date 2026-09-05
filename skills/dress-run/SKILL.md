@@ -45,9 +45,7 @@ git diff -M --numstat <range> | awk '{a+=$1;b+=$2} END{print a+b}'   # <range> =
 
 Not `grep -cE '^[-+]'` — the `--- a/…` and `+++ b/…` headers match it too and inflate the count by 2 per file. ≤ 300 → walk the checklist inline. > 300 → dispatch one reviewer subagent per pack (**Opus, never Sonnet/Haiku**) with that pack's checklist + the diff, then merge their findings. Say which mode you picked.
 
-Exception: when the invocation says so explicitly — `notes-call` states this diff is already a chunk it split and its own self-escalation should stay off — turn this self-escalation off entirely for that chunk and always walk it inline; splitting twice multiplies Opus reviewers re-reading overlapping context for nothing. Absent that explicit line — including when `notes-call` calls `dress-run` on a whole diff it never split — the 300-line rule above still applies as normal.
-
-Called from `notes-call`: return that chunk's coverage ledger too, matching the ledger `notes-call`'s §7.1 defines; a chunk that comes back with an incomplete ledger gets rerun. Also re-run at least two of the ledger's rows' `git grep` verbatim — the same command, never a narrower one — and paste each command's raw output; mark it `ตรง` or `ไม่ตรง` against what the row already claims, and total the result as `<k>/<rows>`, feeding straight into `notes-call`'s report line `สุ่มรันซ้ำ <k>/<rows>`. A verdict with no pasted output is the same free attestation `notes-call`'s §7.1 bans — it is the only thing that turns the ledger's completeness guarantee into a depth guarantee. A `ไม่ตรง` result is a finding about the ledger, not a footnote — give it its own `[LEDGER]` line in §3's report, outside the 12-finding cap.
+**Under `notes-call` this file is a checklist, not a dispatch.** `notes-call` runs one reviewer per chunk — you, inline, or one Opus subagent for a fan-out chunk — and that reviewer walks the groups and packs below **and** the correctness bar `/code-review` sets, in one pass. The invocation says "this is a `notes-call` chunk, review it inline, no self-escalation": the 300-line rule above is off for that chunk, and splitting it again is the one thing not to do. The reviewer's first output is `ledger.sh -- <files>` run on the chunk, unedited — `notes-call`'s §7.1 says what to do with it. Called on a whole diff with no such line, the 300-line rule applies as normal.
 
 ## 2. Universal groups
 
@@ -134,8 +132,6 @@ One line per finding, ordered by what it costs the product — not by group numb
 ```
 
 **Cap: 12 findings.** Past that, report the 12 that matter and add one line: `+N more, mostly <group>`. A 30-item list is a list nobody acts on.
-
-**Ledger re-run mismatch gets its own line, uncapped.** Called from `notes-call` and a re-run row comes back `ไม่ตรง` → report it as `[LEDGER ไม่ตรง] <file:line> — row claimed <...>, re-run got <...>`, separate from the 12-finding list above; it never counts against the cap.
 
 Two conventions worth using when they apply:
 

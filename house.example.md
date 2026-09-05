@@ -2,6 +2,10 @@
 repos: [service-a, service-b, web]
 base-branch: develop
 programs-dir: docs/programs
+review-floor-lines: 150
+review-fanout-lines: 800
+review-chunk-lines: 400
+review-max-chunks: 4
 ---
 
 # house rules
@@ -20,6 +24,13 @@ Group into 3–5 logical commits → rebase onto the base branch → `push --for
 ## Smoke
 Backend: run it yourself against the local service. UI you cannot drive: write a concrete
 checklist and hand it to the user as a blocking gate.
+
+## Runtime
+Run as written by `call-board`, and before every smoke. Each command is followed by what green
+looks like; anything else is a runtime-drift warning.
+- `docker compose ps --format '{{.Name}} {{.Status}}'` — expect: every service `Up`
+- `make migrate-status` — expect: `no pending migrations`
+- `git -C service-a rev-parse --short HEAD` vs `curl -s localhost:8080/version` — expect: same commit
 
 ## Reference locations
 - `docs/integrations/*/gotchas.md` — read in full when the work touches that integration

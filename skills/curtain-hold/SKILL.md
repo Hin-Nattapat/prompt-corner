@@ -24,6 +24,8 @@ This skill names program map sections (§1/§3/§4) and the `🔒`/`❓` status 
 
 If a program map is in play, log the line to its drift log. If there is no program map — lean work has none — there is no drift log to write to: put the line under the Flow Summary's UNVERIFIED section instead.
 
+**Not an entry point:** the code and the phase plan disagree, and none of C1–C7 below applies — the plan named an endpoint and the code went through the existing hook, say. That is `notes-call`'s owner-call bin: one drift-log line and a bullet at the chunk's STOP. Running this skill on it dresses a one-sentence plan edit as a structural stop.
+
 ## Steps
 
 1. **Pin the fact** — one line + `file:line`. Not an interpretation.

@@ -26,15 +26,15 @@ A map found with `status: parked` is not "no map" — this feature already has o
 3. Per phase, in order:
    - Invoke `superpowers:writing-plans` for that phase only — not the whole feature.
    - Implement the plan.
-   - Invoke `notes-call` per its own chunking rule — a phase running past 800 lines is split and reviewed chunk by chunk as that happens, not held to a single call at phase end. Below its floor it already collapses to a one-line ledger; the floor's own numbers aren't restated here, `notes-call` owns them.
-   - Run the smoke handoff. Default: anything you can drive yourself (a backend endpoint, a CLI, a script) you run yourself; anything you cannot drive (web UI, native app, hardware) becomes a precise checklist handed to the user as a blocking gate. `house.md`'s `## Smoke` section wins where it says otherwise.
-   - **STOP.** Report and wait for the user.
+   - Invoke `notes-call` per its own chunking rule — a phase that crosses its fan-out line is split and reviewed chunk by chunk as that happens, not held to a single call at phase end. Its script reads the thresholds from `house.md`; none are restated here. Its round commits (`fix: review round <n>`) are expected on the branch and are squashed by the git tail below.
+   - Run the smoke handoff. First the runtime check `call-board` runs from `house.md`'s `## Runtime` section — the running service must be the code just reviewed, with every migration applied; otherwise smoke is blocked and the report says so. Then, default: anything you can drive yourself (a backend endpoint, a CLI, a script) you run yourself; anything you cannot drive (web UI, native app, hardware) becomes a precise checklist handed to the user as a blocking gate. `house.md`'s `## Smoke` section wins where it says otherwise.
+   - **STOP.** Report and wait for the user. `notes-call`'s `รอเจ้าของเคาะ (O)` bullets are decided here — each one is a plan sentence the user keeps or changes, not a `curtain-hold` case.
    - On "push and pr" — run the git tail. Default: branch off the base branch, group into logical commits, rebase, push, open the PR, hand back the URL — never merge. `house.md`'s `## Git tail` section wins where it says otherwise, including its own trailing steps. A phase touching more than one repo runs that tail once per repo and lands one PR per repo — never treat one repo's merge as the phase merging.
    - Move to the next phase only after the user has acted on the STOP above.
 
 ## Re-entry after curtain-hold
 
-`notes-call` escalates a Type-B finding to `curtain-hold`. A `structural` verdict there rewrites the map's §1–§4 and re-scopes phases — the plan the current phase was executing, and the `phases` list this skill was iterating, are both stale the moment that happens. Correct the map first, then re-derive the current phase from the rewritten `phases` list; the old phase numbering is never resumed as if the verdict hadn't landed. A `curtain-hold` stop is not one of the phase boundaries above — it interrupts a phase mid-flight — so it falls under "never past a STOP" below too.
+`notes-call` escalates a B finding to `curtain-hold` — never an O finding, which waits at the phase STOP instead. A `structural` verdict there rewrites the map's §1–§4 and re-scopes phases — the plan the current phase was executing, and the `phases` list this skill was iterating, are both stale the moment that happens. Correct the map first, then re-derive the current phase from the rewritten `phases` list; the old phase numbering is never resumed as if the verdict hadn't landed. A `curtain-hold` stop is not one of the phase boundaries above — it interrupts a phase mid-flight — so it falls under "never past a STOP" below too.
 
 ## Never past a STOP
 
