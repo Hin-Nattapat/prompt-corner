@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/skills-6-111111?style=flat-square" alt="6 skills">
+  <img src="https://img.shields.io/badge/skills-7-111111?style=flat-square" alt="7 skills">
   <img src="https://img.shields.io/badge/install-npx%20skills-111111?style=flat-square" alt="npx skills">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
 </p>
@@ -21,7 +21,7 @@ nobody wrote down: the assumption phase 1 made about someone else's API, the con
 owed phase 3, the repo that merged while its counterpart PR sat open, the review that ticked
 twelve files it never opened.
 
-prompt-corner is six skills that hold those seams. They drive a feature from design to the last
+prompt-corner is seven skills that hold those seams. They drive a feature from design to the last
 merged PR — and stop for you at every gate, every time, including when you tell them not to.
 
 ## Before / after
@@ -49,6 +49,7 @@ it — two phases get re-scoped, in the session that can least afford it.
 | **`call-board`** | board | Where every feature stands across every repo — with the half-merge warning that a PR list alone can't give you. |
 | **`curtain-hold`** | hold | A premise turned out false. Map the blast radius by grep, classify patch vs structural, stop for the human. |
 | **`dress-run`** | dress rehearsal | Craft review of a diff: smell, over-engineering, comment noise, branch shape, cost, blast radius. |
+| **`interval-call`** | interval | Before a compact: writes where the feature stands — step, open decisions, next action — so the next context resumes from a file, not a summary. |
 
 ## How it works
 
@@ -96,7 +97,9 @@ flowchart LR
 
 `dress-run` is the craft checklist the one reviewer per chunk walks inside `notes-call`;
 `call-board` answers "where is everything" from outside the flow, at any point, and runs the
-project's runtime checks before smoke.
+project's runtime checks before smoke. `interval-call` is invoked by hand before `/compact`: it
+flushes what the chat still owes to disk and writes a handoff file whose `step` line `call-board`
+reads back after the compact.
 
 **Every `STOP` waits for a person.** There is no flag, mode, or phrasing that walks through one —
 including a stop that arrives when the work is nearly done, which is the most expensive one to skip.
@@ -168,7 +171,7 @@ Or from inside a session, as two separate prompts:
 ```
 
 Skills load on the next session. `claude plugin details prompt-corner` shows the inventory and its
-token cost (~1k always-on for all six).
+token cost (~1.2k always-on for all seven).
 
 ### Claude Code — as plain skills
 
@@ -205,7 +208,7 @@ claude plugin uninstall prompt-corner@prompt-corner
 claude plugin marketplace remove prompt-corner
 # or, for a plain-skill install:
 npx skills remove stage-manager prompt-book notes-call \
-                  call-board curtain-hold dress-run
+                  call-board curtain-hold dress-run interval-call
 ```
 
 ## Per-project settings — `.claude/house.md`
@@ -235,6 +238,8 @@ programs-dir: docs/programs
 | `## Git tail` | `stage-manager` | branch → group → rebase → push → PR, never merge |
 | `## Smoke` | `stage-manager` | drive what you can, hand the rest over as a blocking checklist |
 | `## Runtime` | `call-board`, `stage-manager` | not checked, and the report says so |
+| `<programs-dir>/*.handoff.md`, `.claude/handoff.md` | written by `interval-call`, read by `call-board` | no handoff, nothing to resume from |
+| `<programs-dir>/<program>.questions.md` | written by `prompt-book`, answered by a person | every 🔒/❓ stays open |
 | `## Reference locations` | `prompt-book` | nothing to sweep |
 | `## Known consumers` | `curtain-hold`, `dress-run` | grep only |
 | `## Shared modules` | `dress-run` | callers are in-repo only |
@@ -245,12 +250,14 @@ programs-dir: docs/programs
 ## Language packs
 
 `dress-run` picks packs by the file extensions in the diff, on top of its universal groups
-(comment noise, branch shape, over-engineering, dirty code, edge cases, blast radius, cost):
+(comment noise, branch shape, over-engineering, dirty code with Fowler's shape smells, edge cases,
+blast radius, cost):
 
 | Extension | Pack |
 |---|---|
 | `*.go` | [`packs/go.md`](skills/dress-run/packs/go.md) |
 | `*.ts *.tsx *.js *.jsx` | [`packs/react.md`](skills/dress-run/packs/react.md) |
+| `*.py` | [`packs/python.md`](skills/dress-run/packs/python.md) |
 
 A language with no pack still gets every universal group — the review says so in its opening line.
 **Adding a language is one file**, no change to the skill.
@@ -274,6 +281,9 @@ last-touched: YYYY-MM-DD
 ## §4 premises              ## §5 verify
 ```
 
+§2 may end with `### ยังไม่ชัด` — work that is in scope but cannot yet be stated as a phase. It
+stays out of `phases:` until the phase before it lands and sharpens it; fog is not pre-sliced.
+
 Every §4 premise carries a status marker, and they are not decoration:
 
 | | Meaning |
@@ -283,6 +293,10 @@ Every §4 premise carries a status marker, and they are not decoration:
 | 🔒 | only a human can settle it — **do not design over it** |
 | 🔓 | waived on a date, with the assumption it rests on written down |
 | ❌ | turned out false |
+
+Every 🔒 and ❓ question is written to `<program>.questions.md` once, before phase 1, with the
+evidence, the options and a blank `answer:` line — answered in the file or in the chat, it lands
+back in the §4 row and the block is deleted. Asking in the chat alone is what a compact erases.
 
 §5 points at a `verify-<program>.sh` built on the shipped
 [`chk.sh`](skills/prompt-book/assets/chk.sh) — one `chk` line per premise a grep can settle, one
@@ -338,7 +352,7 @@ house.example.md                the per-project settings template
 
 ## FAQ
 
-**Do I have to use all six?** No. `dress-run` and `call-board` stand alone. `stage-manager` is the
+**Do I have to use all seven?** No. `dress-run`, `call-board` and `interval-call` stand alone. `stage-manager` is the
 one that assumes the others.
 
 **Does it work in a repo with no program map?** Yes — that is the lean path, and it is where most

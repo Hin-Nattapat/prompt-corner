@@ -7,9 +7,9 @@
     {
       "name": "prompt-corner",
       "source": "./",
-      "description": "Six skills that drive a multi-phase feature from design to the last merged PR, stopping at every gate",
+      "description": "Seven skills that drive a multi-phase feature from design to the last merged PR, stopping at every gate",
       "category": "development"
     }
   ],
-  "description": "Six skills that call a multi-phase feature from design to the last merged PR, stopping at every gate"
+  "description": "Seven skills that call a multi-phase feature from design to the last merged PR, stopping at every gate"
 }

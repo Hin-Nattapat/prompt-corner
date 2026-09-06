@@ -16,7 +16,8 @@ The argument is a repo (default: current) plus a free-text description of the wo
 Resolve the base branch once, then get the diff yourself. Always pass `-M` so a renamed file reads as a rename instead of a whole-file delete + add:
 
 ```bash
-base=$(sed -n 's/^base-branch: *//p' .claude/house.md 2>/dev/null)
+d=$PWD; while [ "$d" != / ] && [ ! -f "$d/.claude/house.md" ]; do d=$(dirname "$d"); done   # house.md may sit above the repo
+base=$(sed -n 's/^base-branch: *//p' "$d/.claude/house.md" 2>/dev/null)
 base=${base:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')}
 base=${base:-main}
 
@@ -34,6 +35,7 @@ Read every **newly added file in full**, not just as diff lines — a new file h
 |---|---|
 | `*.go` | `packs/go.md` |
 | `*.ts *.tsx *.js *.jsx` | `packs/react.md` |
+| `*.py` | `packs/python.md` |
 
 No pack matches the language in front of you → the universal groups still run in full, and say so in the report's opening line. A project adds its own rows — component names, entity names, layer contracts — under `## Review additions` in `.claude/house.md`; read it if present and fold its rows into the matching group.
 
@@ -80,9 +82,17 @@ Keep a one-line non-obvious WHY (hidden invariant, surprising divergence from a 
 - interface / generic / config option / abstraction with exactly one caller or one implementation today
 - helper used once where inlining reads better
 - indirection added "for later"
+- **middle man** — a function or type that mostly delegates onward → cut it, call the target
+- **message chain** — `a.b().c().d()` the caller now depends on → one method on the first object
 
 ### G5 — dirty code
 Dead code, unused vars, names that don't say what they hold, deep nesting an early return would flatten, duplicated block, magic number, a swallowed error, inconsistent naming vs the sibling file.
+
+Four shape smells (Fowler, *Refactoring* ch.3), each a judgement call named as one — "possible data clump" — never a hard violation:
+- **data clump** — the same three fields or params travel together again in this diff → one type
+- **primitive obsession** — a string or int standing in for a domain concept (money, an ID, a status) → its own small type
+- **feature envy** — a method that reads another object's data more than its own → move it there
+- **shotgun surgery** — one logical change scattered across many files in the diff → the split is wrong; name the module that should own it. **divergent change** is the mirror: one file edited for two unrelated reasons.
 
 ### G6 — edge cases
 Language-independent rows; the packs add the ones that only exist in their language:

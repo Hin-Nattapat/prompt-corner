@@ -3,8 +3,10 @@
 #
 #   bash ledger.sh                 whole review range: working tree vs merge-base with the base branch
 #   bash ledger.sh -- <file>...    one fan-out chunk: only these files
+#   bash ledger.sh -C <repo> ...   run against that repo (when the cwd is a workspace root above it)
 #
-# Reads .claude/house.md at the repo root when present:
+# Reads the nearest .claude/house.md walking up from the cwd — the project root may sit above
+# several git repos, so the repo root is not where it is looked for. HOUSE_MD=<path> overrides.
 #   base-branch:          default origin/HEAD, else main
 #   review-floor-lines:   150   at or under this (and <= 5 files) the review collapses to the floor
 #   review-fanout-lines:  800   above this (or > 15 files) the review fans out into chunks
@@ -16,8 +18,19 @@
 # that sit outside the diff listed first). Nothing here is the writer's word: rerun it to check it.
 set -u
 
-house=.claude/house.md
-key() { sed -n "s/^$1:[[:space:]]*//p" "$house" 2>/dev/null | head -1 | tr -d '[:space:]'; }
+if [ "${1:-}" = "-C" ]; then cd "${2:?-C needs a directory}" || exit 1; shift 2; fi
+
+find_house() {
+  local d; d=$(pwd -P)
+  while :; do
+    [ -f "$d/.claude/house.md" ] && { printf '%s\n' "$d/.claude/house.md"; return; }
+    [ "$d" = / ] && return
+    d=$(dirname "$d")
+  done
+}
+house=${HOUSE_MD:-$(find_house)}
+[ -n "$house" ] && [ ! -f "$house" ] && house=""
+key() { [ -n "$house" ] && sed -n "s/^$1:[[:space:]]*//p" "$house" 2>/dev/null | head -1 | tr -d '[:space:]'; }
 
 base=$(key base-branch)
 base=${base:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')}
@@ -34,7 +47,7 @@ sym_cap=80
 scope=()
 if [ "${1:-}" = "--" ]; then shift; scope=("$@"); fi
 
-root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "FAIL not inside a git repo"; exit 1; }
+root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "FAIL not inside a git repo — cd into the repo or pass -C <repo>"; exit 1; }
 cd "$root" || exit 1
 
 git fetch -q origin 2>/dev/null || echo "WARN fetch origin failed — base may be stale"
@@ -53,7 +66,7 @@ while IFS= read -r f; do
 done < "$tmp/untracked" >> "$tmp/numstat"
 
 if [ ! -s "$tmp/numstat" ]; then
-  echo "LEDGER  base origin/$base@$(git rev-parse --short "$mb") · 0 files · 0 lines"
+  echo "LEDGER  base origin/$base@$(git rev-parse --short "$mb") · 0 files · 0 lines · house ${house:-none}"
   echo "MODE    nothing to review"
   exit 0
 fi
@@ -101,6 +114,9 @@ decl_awk='
         if (match(rest, /^[A-Za-z_][A-Za-z0-9_.]*/)) { sym = substr(rest, 1, RLENGTH); sub(/^.*\./, "", sym) }
       }
     }
+    if (sym == "" && col0 && match(s, /^[A-Z_][A-Z0-9_]*[ \t]*[:=]/) && substr(s, RLENGTH + 1, 1) != "=") {
+      sym = s; sub(/[ \t]*[:=].*$/, "", sym)                       # NAME = ... / NAME: Final = ... at column 0
+    }
     if (sym == "" || length(sym) < 3) return
     print path "\t" sym
   }
@@ -117,27 +133,33 @@ done < "$tmp/untracked" >> "$tmp/syms"
 sort -u "$tmp/syms" -o "$tmp/syms"
 
 # ---- header ---------------------------------------------------------------------------------
-read -r files lines added removed < <(awk '{
+# Prose (.md .txt .rst .adoc) is listed in the ledger like any file but does not size the review:
+# MODE, DIRS and the chunk cap read code lines only. Hit counts are never filtered.
+prose='\.(md|markdown|txt|rst|adoc)$'
+read -r files lines added removed code_files code_lines prose_lines < <(awk -v prosere="$prose" '{
   a = ($1 == "-" ? 0 : $1); d = ($2 == "-" ? 0 : $2); n++; add += a; del += d
-} END { print n+0, add+del, add+0, del+0 }' "$tmp/numstat")
+  if ($3 ~ prosere) pl += a + d; else { cn++; cl += a + d }
+} END { print n+0, add+del, add+0, del+0, cn+0, cl+0, pl+0 }' "$tmp/numstat")
 untracked=$(grep -c . "$tmp/untracked" 2>/dev/null || true)
 symcount=$(wc -l < "$tmp/syms" | tr -d ' ')
 
-echo "LEDGER  base origin/$base@$(git rev-parse --short "$mb") · $files files · $lines lines (+$added/-$removed) · $untracked untracked · $symcount symbols"
+echo "LEDGER  base origin/$base@$(git rev-parse --short "$mb") · $files files · $lines lines (+$added/-$removed · $code_lines code · $prose_lines prose) · $untracked untracked · $symcount symbols · house ${house:-none}"
 [ "$symcount" -gt "$sym_cap" ] && echo "WARN    $symcount symbols is past $sym_cap — a generated file is probably in the range; review it as a chunk of its own"
 if [ "${#scope[@]}" -gt 0 ]; then
-  echo "MODE    chunk (${#scope[@]} files given) · chunk cap $chunk_lines"
-elif [ "$lines" -le "$floor_lines" ] && [ "$files" -le "$floor_files" ]; then
-  echo "MODE    floor · ≤$floor_lines lines and ≤$floor_files files"
-elif [ "$lines" -gt "$fanout_lines" ] || [ "$files" -gt "$fanout_files" ]; then
-  chunks=$(( (lines + chunk_lines - 1) / chunk_lines ))
+  line="MODE    chunk · ${#scope[@]} files · $code_lines code lines vs cap $chunk_lines"
+  [ "$code_lines" -gt "$chunk_lines" ] && line="$line · OVER CAP $code_lines > $chunk_lines — split this chunk before dispatching"
+  echo "$line"
+elif [ "$code_lines" -le "$floor_lines" ] && [ "$code_files" -le "$floor_files" ]; then
+  echo "MODE    floor · ≤$floor_lines code lines and ≤$floor_files code files"
+elif [ "$code_lines" -gt "$fanout_lines" ] || [ "$code_files" -gt "$fanout_files" ]; then
+  chunks=$(( (code_lines + chunk_lines - 1) / chunk_lines ))
   line="MODE    fan-out · $chunks chunks of ≤$chunk_lines lines"
   if [ -n "$max_chunks" ] && [ "$chunks" -gt "$max_chunks" ]; then
     line="$line · OVER BUDGET $chunks > review-max-chunks $max_chunks — stop and ask before dispatching"
   fi
   echo "$line"
-  awk '{ a = ($1 == "-" ? 0 : $1); d = ($2 == "-" ? 0 : $2); p = $3; sub(/\/[^\/]*$/, "", p); if (p == $3) p = "."; t[p] += a + d }
-       END { for (p in t) printf "  %6d  %s\n", t[p], p }' "$tmp/numstat" | sort -rn | { echo "DIRS    lines per directory, to cut chunks along"; cat; }
+  awk -v prosere="$prose" '$3 !~ prosere { a = ($1 == "-" ? 0 : $1); d = ($2 == "-" ? 0 : $2); p = $3; sub(/\/[^\/]*$/, "", p); if (p == $3) p = "."; t[p] += a + d }
+       END { for (p in t) printf "  %6d  %s\n", t[p], p }' "$tmp/numstat" | sort -rn | { echo "DIRS    code lines per directory, to cut chunks along"; cat; }
 else
   echo "MODE    inline · floor $floor_lines · fan-out $fanout_lines"
 fi
@@ -155,7 +177,7 @@ while IFS=$'\t' read -r add del f; do
     git grep -n -w --untracked -e "$sym" -- . > "$tmp/hits" 2>/dev/null
     total=$(grep -c . "$tmp/hits" 2>/dev/null || true)
     # classify each hit: outside the diff unless its path:line falls in a hunk (untracked files are wholly in-diff)
-    awk -F: -v hunkfile="$tmp/hunks" -v exclre="$excl" '
+    awk -F: -v hunkfile="$tmp/hunks" -v exclre="$excl" -v prosere="$prose" '
       BEGIN { while ((getline l < hunkfile) > 0) { split(l, h, "\t"); ranges[h[1]] = ranges[h[1]] " " h[2] "-" h[3] } }
       {
         p = $1; ln = $2 + 0; in_diff = 0
@@ -164,12 +186,18 @@ while IFS=$'\t' read -r add del f; do
         if (in_diff) { inside++; next }
         outside++
         if (p ~ exclre) { hidden++; next }
-        if (shown < cap) { shown++; print "    " $0 }
+        if (p ~ prosere) { odocs++; if (ndoc < cap) doc[++ndoc] = $0; next }
+        ocode++; if (ncode < cap) code[++ncode] = $0
       }
-      END { printf "  %-28s %d hits · %d outside diff", SYM, inside + outside, outside > "/dev/stderr"
-            if (hidden) printf " (%d in excluded paths)", hidden > "/dev/stderr"
-            if (outside - hidden > shown) printf " · %d of %d shown", shown, outside - hidden > "/dev/stderr"
-            printf "\n" > "/dev/stderr" }
+      END {
+        # code hits first, then docs, both under one cap — a lead in code outranks a mention in prose
+        for (i = 1; i <= ncode && shown < cap; i++) { print "    " code[i]; shown++ }
+        for (i = 1; i <= ndoc && shown < cap; i++)  { print "    " doc[i]; shown++ }
+        printf "  %-28s %d hits · %d outside diff", SYM, inside + outside, outside > "/dev/stderr"
+        if (outside) printf " (%d code · %d docs)", ocode, odocs > "/dev/stderr"
+        if (hidden) printf " · %d in excluded paths", hidden > "/dev/stderr"
+        if (ocode + odocs > shown) printf " · %d of %d shown", shown, ocode + odocs > "/dev/stderr"
+        printf "\n" > "/dev/stderr" }
     ' SYM="$sym" cap="$paste_cap" "$tmp/hits" 2>"$tmp/line" > "$tmp/body"
     cat "$tmp/line" "$tmp/body"
   done

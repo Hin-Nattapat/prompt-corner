@@ -16,17 +16,20 @@ Fires at the end of a finished chunk, before commits are grouped, or on "review"
 ```bash
 bash "<skill-dir>/assets/ledger.sh"                 # the whole review range
 bash "<skill-dir>/assets/ledger.sh" -- <file>...    # one fan-out chunk
+bash "<skill-dir>/assets/ledger.sh" -C <repo>       # from a workspace root that holds several repos
 ```
 
-It fetches, resolves the base branch, measures the working tree against the merge-base — committed, staged, unstaged and untracked in one range — and prints three things: a `LEDGER` line (files, lines, untracked, symbols), a `MODE` line, and one block per changed file. Thresholds come from `.claude/house.md` frontmatter; every key is optional:
+It fetches, resolves the base branch, measures the working tree against the merge-base — committed, staged, unstaged and untracked in one range — and prints three things: a `LEDGER` line (files, lines, untracked, symbols, and which `house.md` it read — `house none` means every default applied, check that before trusting the range), a `MODE` line, and one block per changed file. Thresholds come from the nearest `.claude/house.md` walking up from the cwd, so a project root above several repos is found; every key is optional:
 
 | key | default | effect |
 |---|---|---|
 | `base-branch` | `origin/HEAD`, else `main` | the branch the merge-base is taken against |
 | `review-floor-lines` | 150 | at or under this, and ≤ 5 files → `floor` |
 | `review-fanout-lines` | 800 | above this, or > 15 files → `fan-out` |
-| `review-chunk-lines` | 400 | most lines one chunk may hold |
+| `review-chunk-lines` | 400 | most lines one chunk may hold — `-- <files>` mode prints `OVER CAP` when the chunk exceeds it |
 | `review-max-chunks` | none | more chunks than this → the `MODE` line says `OVER BUDGET`; stop and ask the user before dispatching anything |
+
+Every threshold counts **code lines**: prose (`.md .txt .rst .adoc`) gets its block in the ledger like any file, and its symbols are counted, but it does not size the review — the `LEDGER` line shows both (`912 lines · 712 code · 200 prose`). A symbol's outside-diff hits are split the same way (`199 outside diff (4 code · 195 docs)`), code hits pasted first: a lead in code outranks a mention in a plan.
 
 `FAIL` on the first line → paste it and stop; do not measure around it with your own `git diff`. Every number below reads the script's output, never a range you picked.
 
@@ -39,7 +42,7 @@ The script's output **is** the ledger: one block per file with its `+/-`, its hu
 Two things the script cannot do are yours:
 
 1. **Read every listed file at its hunk ranges**, and the whole of every `untracked` file — a new file has no surrounding context to judge it against.
-2. **Add the declarations the regex misses** — names inside a grouped Go `const (`/`var (`/`type (` block, class methods, anything the language spells without a keyword the script knows. Each gets one line in the same shape, produced by the same command the script uses:
+2. **Add the declarations the regex misses** — names inside a grouped Go `const (`/`var (`/`type (` block, class methods, anything the language spells without a keyword the script knows (column-0 `UPPER_CASE = …` constants are caught). Each gets one line in the same shape, produced by the same command the script uses:
 
    ```bash
    git grep -n -w --untracked -e <sym> -- .

@@ -34,6 +34,11 @@ only keeps this reference from self-matching.
 The six headings above MUST be written exactly as shown, each at the start of its own
 line in the real map file.
 
+§2 may end with an optional `### ยังไม่ชัด` subsection: one line per piece of work that is in scope
+but cannot yet be stated as a phase (no deliverable, no contract), naming the open question and the
+phase whose landing will sharpen it. Nothing there appears in `phases:`; a line graduates into a real
+phase, or is struck, when that phase lands. Out-of-scope work does not go here — it goes in the drift log.
+
 ## Rules
 
 1. Drift log: separate file `<topic>.drift.md`; map file ceiling is 150 lines (drift log not counted).
