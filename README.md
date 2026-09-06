@@ -99,7 +99,11 @@ flowchart LR
 `call-board` answers "where is everything" from outside the flow, at any point, and runs the
 project's runtime checks before smoke. `interval-call` is invoked by hand before `/compact`: it
 flushes what the chat still owes to disk and writes a handoff file whose `step` line `call-board`
-reads back after the compact.
+reads back after the compact. For the compact nobody saw coming, the plugin ships two hooks: a
+`PreCompact` hook writes the mechanical position (`branch@sha`, `git status`, `git log`, the
+map and plan paths) to `<program>.handoff.auto.md`, and a `SessionStart` hook lists every
+handoff file into the fresh context. A script can record where you were; only a person or the
+skill can record what was undecided.
 
 **Every `STOP` waits for a person.** There is no flag, mode, or phrasing that walks through one —
 including a stop that arrives when the work is nearly done, which is the most expensive one to skip.
@@ -232,13 +236,16 @@ programs-dir: docs/programs
 | `programs-dir:` | `prompt-book`, `call-board` | `.claude/programs/` |
 | `review-floor-lines:` | `notes-call` | 150 — at or under, the review collapses |
 | `review-fanout-lines:` | `notes-call` | 800 — above, the review fans out |
-| `review-chunk-lines:` | `notes-call` | 400 per chunk |
+| `review-chunk-lines:` | `notes-call` | 600 per chunk |
 | `review-max-chunks:` | `notes-call` | unlimited — set it and an over-budget fan-out stops to ask |
 | `## Default flow` | `stage-manager`, `curtain-hold` | the sequence above |
 | `## Git tail` | `stage-manager` | branch → group → rebase → push → PR, never merge |
 | `## Smoke` | `stage-manager` | drive what you can, hand the rest over as a blocking checklist |
 | `## Runtime` | `call-board`, `stage-manager` | not checked, and the report says so |
+| `## Mutation` | `notes-call` chunk reviewers | hand mutation, capped at 20 mutants |
 | `<programs-dir>/*.handoff.md`, `.claude/handoff.md` | written by `interval-call`, read by `call-board` | no handoff, nothing to resume from |
+| `*.handoff.auto.md` | written by the `PreCompact` hook, read by `call-board` | the compact happened without the plugin |
+| `.claude/review/` | chunk brief, round briefs and per-chunk ledger files written by `notes-call`; never committed | reviewers read the corpus, fix agents get no allowlist |
 | `<programs-dir>/<program>.questions.md` | written by `prompt-book`, answered by a person | every 🔒/❓ stays open |
 | `## Reference locations` | `prompt-book` | nothing to sweep |
 | `## Known consumers` | `curtain-hold`, `dress-run` | grep only |
@@ -344,7 +351,9 @@ Layout:
 skills/<name>/SKILL.md          the skill; its description is what makes it fire
 skills/prompt-book/assets/      chk.sh, seeded into a project's programs dir
 skills/notes-call/assets/       ledger.sh, the script that builds the coverage ledger
-skills/notes-call/reference/    why the ledger is a script — read when changing it
+skills/notes-call/reference/    ledger-design.md and measured.md — the reasoning and the numbers behind the rules; read when changing one
+skills/interval-call/assets/    the two hook scripts: handoff-auto.sh (PreCompact), handoff-list.sh (SessionStart compact)
+hooks/hooks.json                registers those two hooks when the plugin is enabled
 skills/prompt-book/reference/   the program-map format authority
 skills/dress-run/packs/         one file per language
 house.example.md                the per-project settings template

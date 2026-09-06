@@ -4,7 +4,7 @@ base-branch: develop
 programs-dir: docs/programs
 review-floor-lines: 150
 review-fanout-lines: 800
-review-chunk-lines: 400
+review-chunk-lines: 600
 review-max-chunks: 4
 ---
 
@@ -24,6 +24,11 @@ Group into 3–5 logical commits → rebase onto the base branch → `push --for
 ## Smoke
 Backend: run it yourself against the local service. UI you cannot drive: write a concrete
 checklist and hand it to the user as a blocking gate.
+
+## Mutation
+One command a `notes-call` chunk reviewer runs on a test chunk instead of mutating by hand; it
+reads only the survivors. Omit the section and the reviewer mutates by hand, capped at 20.
+- `uv run mutmut run --paths-to-mutate src/service-a/control && uv run mutmut results` — survivors listed as `survived`
 
 ## Runtime
 Run as written by `call-board`, and before every smoke. Each command is followed by what green

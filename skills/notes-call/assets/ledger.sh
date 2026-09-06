@@ -4,13 +4,15 @@
 #   bash ledger.sh                 whole review range: working tree vs merge-base with the base branch
 #   bash ledger.sh -- <file>...    one fan-out chunk: only these files
 #   bash ledger.sh -C <repo> ...   run against that repo (when the cwd is a workspace root above it)
+#   bash ledger.sh --leads ...     header plus only the symbols with outside-diff CODE hits — what a
+#                                  reviewer returns; the full output goes to a file, not the chat
 #
 # Reads the nearest .claude/house.md walking up from the cwd — the project root may sit above
 # several git repos, so the repo root is not where it is looked for. HOUSE_MD=<path> overrides.
 #   base-branch:          default origin/HEAD, else main
 #   review-floor-lines:   150   at or under this (and <= 5 files) the review collapses to the floor
 #   review-fanout-lines:  800   above this (or > 15 files) the review fans out into chunks
-#   review-chunk-lines:   400   most lines one chunk may hold
+#   review-chunk-lines:   600   most lines one chunk may hold
 #   review-max-chunks:    unset a fan-out needing more chunks than this prints OVER BUDGET
 #
 # Output, in order: LEDGER line · MODE line · one block per changed file (numstat, hunk ranges,
@@ -18,6 +20,9 @@
 # that sit outside the diff listed first). Nothing here is the writer's word: rerun it to check it.
 set -u
 
+if [ "${1:-}" = "-C" ]; then cd "${2:?-C needs a directory}" || exit 1; shift 2; fi
+leads=0
+if [ "${1:-}" = "--leads" ]; then leads=1; shift; fi
 if [ "${1:-}" = "-C" ]; then cd "${2:?-C needs a directory}" || exit 1; shift 2; fi
 
 find_house() {
@@ -37,7 +42,7 @@ base=${base:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/
 base=${base:-main}
 floor_lines=$(key review-floor-lines);   floor_lines=${floor_lines:-150}
 fanout_lines=$(key review-fanout-lines); fanout_lines=${fanout_lines:-800}
-chunk_lines=$(key review-chunk-lines);   chunk_lines=${chunk_lines:-400}
+chunk_lines=$(key review-chunk-lines);   chunk_lines=${chunk_lines:-600}
 max_chunks=$(key review-max-chunks)
 floor_files=5
 fanout_files=15
@@ -165,6 +170,15 @@ else
 fi
 
 # ---- per-file blocks ------------------------------------------------------------------------
+if [ "$leads" -eq 1 ]; then exec > >(awk '
+  # keep a file line only if a symbol under it has outside-diff code hits; keep such symbols and their pasted hits
+  /^[^ ]/ { if (file != "") flush(); file = $0; keep = 0; buf = ""; next }
+  /^  [^ ]/ { cur = ($0 ~ /outside diff \([1-9][0-9]* code/); if (cur) { keep = 1; buf = buf $0 "\n" }; next }
+  /^    / { if (cur) buf = buf $0 "\n"; next }
+  /^$/ { next }
+  function flush() { if (keep) printf "\n%s\n%s", file, buf }
+  END { if (file != "") flush(); print "\n(--leads: symbols with 0 outside-diff code hits omitted; full ledger in the file this was tee'"'"'d to)" }
+'); fi
 excl='(^|/)(vendor|node_modules|dist|build|testdata|mocks|__snapshots__|\.next|target)/|\.(lock|sum|snap|min\.js|min\.css|pb\.go|gen\.go|gen\.ts)$|_gen\.go$|_generated\.'
 while IFS=$'\t' read -r add del f; do
   hunks=$(awk -F'\t' -v f="$f" '$1 == f { printf "%s%d-%d", (n++ ? " " : ""), $2, $3 }' "$tmp/hunks")

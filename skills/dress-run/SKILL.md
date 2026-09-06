@@ -141,7 +141,7 @@ One line per finding, ordered by what it costs the product — not by group numb
 [G3] internal/service/order.go — 3 comment blocks to trim (88, 140, 212)
 ```
 
-**Cap: 12 findings.** Past that, report the 12 that matter and add one line: `+N more, mostly <group>`. A 30-item list is a list nobody acts on.
+**Cap: 12 findings.** Past that, report the 12 that matter and add one line: `+N more, mostly <group>`. A 30-item list is a list nobody acts on. As a `notes-call` chunk reviewer the whole return is capped at 400 words — findings, `leads:`, verified-clean — and the ledger goes to the file `notes-call` names, not into the reply.
 
 Two conventions worth using when they apply:
 

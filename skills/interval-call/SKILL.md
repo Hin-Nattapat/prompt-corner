@@ -7,7 +7,9 @@ description: Use when the context is getting long and work is mid-feature, right
 
 The call at the interval: everyone is told where act two starts before the house lights come back up. Nothing here reviews, plans or fixes — it writes down the position and stops.
 
-Everything a skill in this set produces already lives on disk except the position inside a phase, and that is what a compact throws away: which plan task is done, which `notes-call` round is open, which O bullets sit unanswered at the STOP, the Flow Summary of lean work. This skill is invoked by hand, when the context is long or before `/compact` — there is no hook, and it never fires on its own. Anything the user types after the command is the **focus** of the next session ("ต่อ smoke phase 2", "แค่ปิด O ข้อแรก") and goes on the handoff's `focus` line verbatim.
+Everything a skill in this set produces already lives on disk except the position inside a phase, and that is what a compact throws away: which plan task is done, which `notes-call` round is open, which O bullets sit unanswered at the STOP, the Flow Summary of lean work. This skill is invoked by hand, when the context is long or before `/compact`. Anything the user types after the command is the **focus** of the next session ("ต่อ smoke phase 2", "แค่ปิด O ข้อแรก") and goes on the handoff's `focus` line verbatim.
+
+**The plugin's hooks cover the compact you did not see coming.** A `PreCompact` hook — manual or automatic — runs `assets/handoff-auto.sh`, which writes the mechanical half (branch@sha, dirty, unpushed, `git status`, `git log`, the map/plan/drift/questions paths) to `<program>.handoff.auto.md`, and a `SessionStart` hook after the compact lists every handoff file into the fresh context. A hook can run a script; it cannot write `ค้างเคาะ` or `ทำต่อ`. So an automatic compact always leaves a position behind, and only this skill leaves the decisions — invoke it whenever the position alone would not be enough to resume.
 
 ## Where it writes
 
@@ -16,7 +18,7 @@ Everything a skill in this set produces already lives on disk except the positio
 | under a program map | `<programs-dir>/<program>.handoff.md` — `program` is the map's frontmatter `program:` value, never the filename; `programs-dir` from `.claude/house.md`, default `.claude/programs/` |
 | lean, no map | `.claude/handoff.md` |
 
-One file per feature, overwritten every time, and **never committed** — the git tail deletes it when the phase lands and never adds it before. `call-board` reads it back; it is not injected anywhere, so its length costs nothing until someone resumes.
+One file per feature, overwritten every time, and **never committed** — the git tail deletes it when the phase lands and never adds it before. Writing it also removes the sibling `.handoff.auto.md` the hook left, since this file supersedes it. `call-board` reads it back; it is not injected anywhere, so its length costs nothing until someone resumes.
 
 ## Steps
 
